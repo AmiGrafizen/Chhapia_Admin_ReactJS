@@ -143,7 +143,7 @@ export const getFaqAction = () => {
 
 export const getBlogAction = () => {
 return (dispatch) => {
-    return ApiGet(`/admin/why-us`)
+    return ApiGet(`/admin/why-choose-us`)
   .then((res) => {
     console.log('resblog', res);
     if (res.data) {

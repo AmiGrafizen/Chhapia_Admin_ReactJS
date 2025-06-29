@@ -10,7 +10,7 @@ import {
 import { DatePicker } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { getFaqAction, getBlogAction, getTeamAction, getTestimonialAction, addFaqAction, addTeamAction, addBlogAction, addTestimonialAction, updateTeamAction, updateFAQAction, updateTestimonialAction, updateBlogAction, getHeroAction, updateHeroAction, addHeroAction, } from "../../redux/action/landingManagement";
-import { ApiDelete, ApiGet, ApiPost } from "../../helper/axios";
+import { ApiDelete, ApiGet, ApiPost, ApiPut } from "../../helper/axios";
 import uploadToHPanel from "../../helper/uploadToHpanel";
 
 export default function Landing() {
@@ -18,39 +18,41 @@ export default function Landing() {
   const [blogmodalopen, setBlogModalOpen] = useState(false);
   const [isDelOpen, setIsDelOpen] = useState(false);
 
-
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [title, setTitle] = useState("");
-  const [headDescription, setHeadDescription] = useState("");
-  // const [sections, setSections] = useState([{ subTitle: "", description: "", icon: "" }]);
-  const [selectedAboutUsImage, setSelectedAboutUsImage] = useState(null);
-  const [savedAboutUsImages, setSavedAboutUsImages] = useState([]);
-  const [aboutData, setAboutData] = useState([]);
-  const [galleryImages, setGalleryImages] = useState([]);
-  const [uploadedImages, setUploadedImages] = useState([]);
-  const [sections, setSections] = useState([]);
 
   const dispatch = useDispatch();
 
   const teams = useSelector((state) => state.landing.getService);
-  const faqs = useSelector((state) => state.landing.getFaq);
+  const calculation = useSelector((state) => state.landing.getFaq);
   const blogs = useSelector((state) => state.landing.getBlog);
   const testimonials = useSelector((state) => state.landing.getTestimonial);
   const hero = useSelector((state) => state.landing.getHeroSection);
 
-  const [newAbout, setNewAbout] = useState({ title: "", description: "", images: [] });
-  const [newFAQ, setNewFAQ] = useState({ name: "", count: "", image: "" });
-  const [newTeamMember, setNewTeamMember] = useState({ name: "", description: "", image: "" });
+  const [newCalculation, setNewCalculation] = useState({ name: "", count: "" });
+  const [newTeamMember, setNewTeamMember] = useState({ name: "", description: "", icon: "" });
   const [newBlog, setNewBlog] = useState({ category: "", description: "", title: "", image: "" });
   const [newTestimonial, setNewTestimonial] = useState({ image: "", description: "" });
   const [newHero, setNewHero] = useState({ image: "" });
+  const [whyData, setWhyData] = useState({ image: null, title: '', description: '', icon: '' });
+  const [aboutData, setAboutData] = useState({
+    title: "",
+    description: "",
+    image: null,
+  });
+  const [previewImage, setPreviewImage] = useState(null);
+  const [aboutId, setAboutId] = useState(null);
+  const [newFaq, setNewFaq] = useState({
+    question: "",
+    answer: "",
+  });
+  const [faqs, setFaqs] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const editor = useRef(null);
   const placeholder = "Start typing...";
 
-  const [selectedImage, setSelectedImage] = useState(null);
   const [selectedImageTeam, setSelectedImageTeam] = useState(null);
-  const [savedImages, setSavedImages] = useState([]);
   const [deleteData, setDeleteData] = useState({ type: "", id: "" });
 
 
@@ -61,24 +63,58 @@ export default function Landing() {
     // dispatch(fetchAboutUs());
     dispatch(getFaqAction());
     dispatch(getTeamAction());
-    dispatch(getBlogAction());
     dispatch(getTestimonialAction());
     dispatch(getHeroAction());
   }, [dispatch]);
 
   useEffect(() => {
-    ApiGet("/admin/about-us")
-      .then((response) => {
-        console.log("response", response)
-        setAboutData(response.AboutUs);
-        if (response.AboutUs) {
-          setHeadDescription(response.AboutUs.headDescription);
-          setSavedAboutUsImages(response.AboutUs.image || []);
-          setSections(response.AboutUs.sections?.length ? response.AboutUs.sections : [{ subTitle: "", description: "" }]);
+    const fetchAboutUs = async () => {
+      try {
+        const res = await ApiGet("/admin/about-us");
+        console.log('resdsefgh', res)
+        if (res) {
+          setAboutData({
+            title: res?.title || "",
+            description: res?.description || "",
+            image: res?.image || null,
+          });
+          setPreviewImage(res?.image);
+          setAboutId(res?._id);
         }
-      })
-      .catch((error) => console.error("Error fetching About Us data:", error));
+      } catch (error) {
+        console.error("Failed to load About Us", error);
+      }
+    };
+
+    fetchAboutUs();
   }, []);
+
+  const fetchFaqs = async () => {
+    try {
+      const res = await ApiGet("/admin/faq");
+      setFaqs(res.data || []);
+    } catch (error) {
+      console.error("Error fetching FAQs", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchFaqs();
+  }, []);
+
+  const fetchWhyList = async () => {
+    try {
+      const res = await ApiGet('/admin/why-choose-us');
+      setWhyData(res?.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWhyList();
+  }, []);
+
 
 
   const config = useMemo(
@@ -97,7 +133,6 @@ export default function Landing() {
   const handleAboutModal = () => {
     setModalOpen(true)
   }
-
   const handleBlogModal = () => {
     setBlogModalOpen(true)
   }
@@ -105,55 +140,14 @@ export default function Landing() {
     setBlogModalOpen(false)
   }
 
-
-  const handleAboutUsImageUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) {
-      alert("Please select images before submitting.");
-      return;
-    }
-    const localPreviews = files.map(file => ({ file, preview: URL.createObjectURL(file) }));
-    setGalleryImages((prev) => [...prev, ...localPreviews]);
-
-    try {
-      const uploaded = await Promise.all(
-        files.map(async (file) => {
-          const imageUrl = await uploadToHPanel(file);
-          return imageUrl;
-        })
-      );
-      setUploadedImages((prevImages) => [...prevImages, ...uploaded]);
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      alert("Failed to upload images.");
-    }
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setAboutData({ ...aboutData, [name]: value });
   };
 
 
-  const uploadGalleryImages = async () => {
-    if (galleryImages.length === 0) {
-      alert("Please select images before submitting.");
-      return;
-    }
-    try {
-      const uploaded = await Promise.all(
-        galleryImages.map(async (image) => {
-          const imageUrl = await uploadToHPanel(image.file);
-          return imageUrl;
-        })
-      );
-      setUploadedImages([...uploadedImages, ...uploaded]);
-      setGalleryImages([]);
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      alert("Failed to upload images.");
-    }
-  };
-
-  // Remove image
-  const removeImage = (index) => {
-    setUploadedImages((prevImages) => prevImages.filter((_, i) => i !== index));
-    setGalleryImages((prev) => prev.filter((_, i) => i !== index));
+  const handleDescriptionChange = (newContent) => {
+    setAboutData((prev) => ({ ...prev, description: newContent }));
   };
 
   const handleImageUploadteam = (event) => {
@@ -164,126 +158,48 @@ export default function Landing() {
     }
   };
 
-  // Handle Save Image
-  const handleSaveImage = () => {
-    if (selectedImage) {
-      setSavedImages([...savedImages, selectedImage]);
-      setSelectedAboutUsImage(null); // Clear preview after saving
-    }
-  };
-
-  // Handle Delete Image
-  const handleDeleteImage = (index) => {
-    const updatedImages = savedImages.filter((_, i) => i !== index);
-    setSavedImages(updatedImages);
-  };
-
-  const handleIconUpload = async (event, index) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    try {
-      const imageUrl = await uploadToHPanel(file);
-      setSections((prevSections) => {
-        const updatedSections = [...prevSections];
-        if (updatedSections[index]) {
-          updatedSections[index].icon = imageUrl;
-        }
-        return updatedSections;
-      });
-    } catch (error) {
-      console.error("Error uploading icon:", error);
-      alert("Failed to upload icon.");
-    }
-  };
-
-
-  const handleSectionChange = (index, field, value) => {
-    const updatedSections = [...sections];
-    updatedSections[index][field] = value;
-    setSections(updatedSections);
-  };
-
-  const addNewSection = () => {
-    setSections([...sections, { subTitle: "", description: "" }]);
-  };
-
-  const handleAboutImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setNewAbout((prev) => ({ ...prev, image: file }));
+      // Show preview while uploading
+      setPreviewImage(URL.createObjectURL(file));
+
+      // Upload to HPanel
+      const uploadedUrl = await uploadToHPanel(file);
+
+      if (uploadedUrl) {
+        setAboutData((prev) => ({ ...prev, image: uploadedUrl }));
+      } else {
+        alert("Image upload failed");
+        setPreviewImage(null);
+      }
     }
   };
 
   const handleSubmit = async () => {
-    console.log("Submitting Data:", { headDescription, image: newAbout.image, sections });
-
-    if (!headDescription || !newAbout.image) {
-      alert("Please fill all required fields and upload an image.");
-      return;
-    }
-
     try {
-      let imageUrl = newAbout.image;
-
-      // Upload only if image is a File object
-      if (newAbout.image instanceof File) {
-        imageUrl = await uploadToHPanel(newAbout.image);
-        if (!imageUrl) {
-          alert("Image upload failed.");
-          return;
-        }
+      if (!aboutData.title || !aboutData.description || !aboutData.image) {
+        alert("Please fill all fields and upload an image.");
+        return;
       }
 
-      const payload = {
-        headDescription,
-        image: imageUrl,
-        sections,
-      };
+      const response = await ApiPost("/admin/about-us", aboutData);
 
-      await ApiPost('/admin/about-us', payload);
-
-      alert('Saved Successfully!');
-      handleModalclose();
-      setHeadDescription("");
-      setNewAbout({ headDescription: "", image: null });
-      setSections([{ subTitle: '', description: '' }]);
+      if (response?.data?.success) {
+        alert(response.data.message || "About Us saved successfully!");
+        setModalOpen(false);
+      } else {
+        alert(response.data.message || "Failed to save About Us.");
+      }
     } catch (error) {
-      console.error('Error saving data:', error);
-      alert("Submission failed. Please try again.");
+      console.error("Submission Error:", error);
+      alert(error?.message || "Something went wrong during submission.");
     }
   };
 
 
-  const addSection = () => {
-    setSections([...sections, { subTitle: '', description: '' }]);
-  };
-
-  // const handleImageChange = async (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
-
-  //   const previewUrl = URL.createObjectURL(file);
-  //   setNewTeamMember((prev) => ({
-  //     ...prev,
-  //     image: file,
-  //     preview: previewUrl,
-  //   }));
-
-  //   const uploadedUrl = await uploadToHPanel(file);
-
-  //   if (uploadedUrl) {
-  //     setNewTeamMember((prev) => ({
-  //       ...prev,
-  //       cloudUrl: uploadedUrl,
-  //     }));
-  //   } else {
-  //     alert("Image upload failed!");
-  //   }
-  // };
-
-
-  const handleEditFAQ = (item) => {
-    setNewFAQ({
+  const handleEditCalculation = (item) => {
+    setNewCalculation({
       _id: item._id,
       name: item.name,
       count: item.count,
@@ -291,26 +207,16 @@ export default function Landing() {
     });
   };
 
-  const handleFaqImageChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      console.log("Selected FAQ image file:", file);
-      setNewFAQ((prev) => ({ ...prev, image: file }));
-    }
-  };
-
-  const handleAddFAQ = async () => {
+  const handleAddCalculation = async () => {
     try {
-      // Check if all required fields are filled
-      if (!newFAQ.name || !newFAQ.count || !newFAQ.image) {
+      if (!newCalculation.name || !newCalculation.count) {
         alert("Please fill all fields and upload an image.");
         return;
       }
 
-      // Upload the image if it's a File object (not already a URL)
-      let imageUrl = newFAQ.image;
-      if (newFAQ.image instanceof File) {
-        const uploadedUrl = await uploadToHPanel(newFAQ.image);
+      let imageUrl = newCalculation.image;
+      if (newCalculation.image instanceof File) {
+        const uploadedUrl = await uploadToHPanel(newCalculation.image);
         if (!uploadedUrl) {
           alert("Image upload failed.");
           return;
@@ -318,24 +224,20 @@ export default function Landing() {
         imageUrl = uploadedUrl;
       }
 
-      // Build the payload with the image URL (string)
       const payload = {
-        name: newFAQ.name,
-        count: newFAQ.count,
-        image: imageUrl,
+        name: newCalculation.name,
+        count: newCalculation.count,
       };
 
       console.log("Final FAQ payload:", payload);
 
-      // Dispatch your Redux actions
-      if (newFAQ._id) {
-        dispatch(updateFAQAction(newFAQ._id, payload));
+      if (newCalculation._id) {
+        dispatch(updateFAQAction(newCalculation._id, payload));
       } else {
         dispatch(addFaqAction(payload));
       }
 
-      // Reset the form state
-      setNewFAQ({ name: "", count: "", image: null });
+      setNewCalculation({ name: "", count: "", image: null });
       dispatch(getFaqAction())
 
       alert("FAQ added successfully!");
@@ -409,7 +311,7 @@ export default function Landing() {
   const handleTeamImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setNewTeamMember((prev) => ({ ...prev, image: file }));
+      setNewTeamMember((prev) => ({ ...prev, icon: file }));
     }
   };
 
@@ -418,18 +320,17 @@ export default function Landing() {
     if (
       !newTeamMember.name ||
       !newTeamMember.description ||
-      !newTeamMember.image
+      !newTeamMember.icon
     ) {
       alert("Please fill all fields and upload an image.");
       return;
     }
 
     try {
-      let imageUrl = newTeamMember.image;
+      let imageUrl = newTeamMember.icon;
 
-      // Upload image only if it's a File object (not already a URL string)
-      if (newTeamMember.image instanceof File) {
-        const uploadedUrl = await uploadToHPanel(newTeamMember.image);
+      if (newTeamMember.icon instanceof File) {
+        const uploadedUrl = await uploadToHPanel(newTeamMember.icon);
         if (!uploadedUrl) {
           alert("Image upload failed.");
           return;
@@ -438,9 +339,9 @@ export default function Landing() {
       }
 
       const payload = {
-        name: newTeamMember.name,
+        title: newTeamMember.name,
         description: newTeamMember.description,
-        image: imageUrl, // must be a URL string
+        icon: imageUrl,
       };
 
       if (newTeamMember._id) {
@@ -450,7 +351,7 @@ export default function Landing() {
       }
 
       // Reset form
-      setNewTeamMember({ name: "", description: "", image: null });
+      setNewTeamMember({ name: "", description: "", icon: null });
       dispatch(getTeamAction());
 
       // Refresh the list
@@ -461,6 +362,67 @@ export default function Landing() {
       console.error("Error adding team member:", error);
       alert("Something went wrong.");
     }
+  };
+
+  const handleWhyUsImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPreviewImage(URL.createObjectURL(file));
+      const uploadedUrl = await uploadToHPanel(file);
+      if (uploadedUrl) {
+        setWhyData((prev) => ({ ...prev, image: uploadedUrl }));
+      } else {
+        alert("Image upload failed.");
+      }
+    }
+  };
+
+  const handleIconChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = await uploadToHPanel(file);
+      if (url) setWhyData((prev) => ({ ...prev, icon: url }));
+    }
+  };
+
+  const handleSubmitWhyUs = async () => {
+    if (!whyData.title || !whyData.description || !whyData.image) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    const payload = {
+      title: whyData.title,
+      description: whyData.description,
+      image: whyData.image,
+      icon: whyData.icon,
+    };
+
+    try {
+      if (editId) {
+        await ApiPut(`/admin/why-choose-us/${editId}`, payload);
+      } else {
+        await ApiPost('/admin/why-choose-us', payload);
+      }
+
+      alert(`Data ${editId ? 'updated' : 'added'} successfully!`);
+      fetchWhyList();
+      setWhyData({ image: null, title: '', description: '', icon: '' });
+      setEditId(null);
+    } catch (error) {
+      console.error("Submit error:", error);
+      alert("Failed to submit data.");
+    }
+  };
+
+  const handleEditWhyUs = (item) => {
+    setWhyData({
+      title: item.title,
+      description: item.description,
+      image: item.image,
+      icon: item.icon || '',
+    });
+    setEditId(item._id);
   };
 
 
@@ -535,6 +497,59 @@ export default function Landing() {
     });
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewFaq({ ...newFaq, [name]: value });
+  };
+
+
+  const handleFaqImageUpload = (e, index) => {
+    const newImages = [...newFaq.images];
+    newImages[index] = e.target.files[0];
+    setNewFaq({ ...newFaq, images: newImages });
+  };
+
+  const handleRemoveImage = (index) => {
+    const newImages = [...newFaq.images];
+    newImages[index] = null;
+    setNewFaq({ ...newFaq, images: newImages });
+  };
+
+  const handleSubmitFaq = async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      question: newFaq.question,
+      answer: newFaq.answer,
+    };
+
+    try {
+      if (isEditing) {
+        await ApiPut(`/admin/faq/${editId}`, payload);
+        alert("Updated successfully!");
+      } else {
+        await ApiPost("/admin/faq", payload);
+        alert("Added successfully!");
+      }
+
+      fetchFaqs();
+      setNewFaq({ question: "", answer: "" });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error adding/updating FAQ", error);
+      alert("Failed to add/update FAQ.");
+    }
+  };
+
+  const handleEdit = (item) => {
+    setNewFaq({
+      question: item.question,
+      answer: item.answer,
+      images: item.images || [null, null],
+    });
+    setEditId(item._id);
+    setIsEditing(true);
+  };
 
   const handleAddTestimonial = async () => {
     if (!newTestimonial.description) {
@@ -624,6 +639,19 @@ export default function Landing() {
     }
   };
 
+  const [newBlogFaq, setNewBlogFaq] = useState({
+    images: [null, null] // Initialize with two null values for two image placeholders
+  });
+
+  // Handles uploading an image to the specified index
+  const handleImageUpload = (e, index) => {
+    const newImages = [...newBlogFaq.images];
+    newImages[index] = e.target.files[0]; // Set the selected image for the correct index
+    setNewBlogFaq((prev) => ({
+      ...prev,
+      images: newImages,
+    }));
+  };
 
 
   return (
@@ -731,39 +759,25 @@ export default function Landing() {
                   <p className="font-[500] text-[30px] font-Montserrat">About Us</p>
 
                   <div className="flex justify-center">
-                    {aboutData?.map((item, index) => (
-                      <div key={index} className="flex w-[100%] flex-col justify-between gap-[20px] cursor-pointer">
-                        <div className=" gap-[20px] flex justify-between w-[100%]">
-                          <div className="w-[60%] flex flex-col gap-[20px]">
-                            <div
-                              className="border-[1.5px] border-[#007e2c] overflow-y-auto  rounded-[8px] h-[120px] p-[10px]"
-                            > {item?.headDescription} </div>
-                            <div className=' flex flex-col  gap-[10px] w-[100%] '>
-                              <div className=' flex  text-[20px] font-[600] '> Our Vission And Mission </div>
-                              {item?.sections?.map((section, index) => (
-                                <div key={index} className=' flex    gap-[10px]  w-[100%] '>
-
-                                  <div className=' flex-col  gap-[10px] flex w-[100%]'>
-                                    <div className='  h-[50px] w-[100%] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex '>
-                                      {section?.subTitle}
-                                    </div>
-                                    <div className='  h-[120px] overflow-y-auto w-[100%] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[4px] flex '>
-                                      {section?.description}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
+                    <div className="flex w-[100%] flex-col justify-between gap-[20px] cursor-pointer">
+                      <div className=" gap-[20px] flex justify-between w-[100%]">
+                        <div className="w-[60%] flex flex-col gap-[20px]">
+                          <div className=' flex-col  gap-[10px] flex w-[100%]'>
+                            <div className='  h-[50px] w-[100%] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex '>
+                              {aboutData?.title}
                             </div>
-                          </div>
-                          <div className=" flex w-[40%]">
-                            <img className=" w-[100%] object-cover h-[400px] rounded-[10px]" src={item?.image} />
-                          </div>
+                            <div
+                              className='h-[180px] overflow-y-auto w-full border-[#007e2c] border-[1.8px] rounded-[4px] p-2'
+                              dangerouslySetInnerHTML={{ __html: aboutData.description }}
+                            ></div>
 
+                          </div>
                         </div>
-
+                        <div className=" flex w-[40%]">
+                          <img className=" w-[96%] object-cover h-[240px] rounded-[10px]" src={aboutData?.image} />
+                        </div>
                       </div>
-
-                    ))}
+                    </div>
                   </div>
                   <button className=' text-[#fff] bg-[#007e2c] text-[20px] flex py-[5px] justify-center items-center rounded-lg  w-[130px]' onClick={handleAboutModal}>
                     Add
@@ -776,40 +790,42 @@ export default function Landing() {
                   <p className="font-[500] text-[30px] font-Montserrat">Our Comprehensive Services</p>
 
                   <div className="flex gap-[20px] flex-wrap ">
-                    <div className="flex flex-col w-[320px] p-[14px] rounded-lg border-[#007e2c] border-[1.8px]  gap-[10px]">
-                      <label className="h-[200px] w-[100%] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-                        {newTeamMember.image ? (
-                          <img
-                            src={
-                              newTeamMember.image
-                                ? typeof newTeamMember.image === "string"
-                                  ? newTeamMember.image
-                                  : URL.createObjectURL(newTeamMember.image)
-                                : ""
-                            }
-                            alt="preview"
-                            className="h-full w-full object-cover"
+                    <div className="flex flex-col h-fit w-[320px] p-[14px] rounded-lg border-[#007e2c] border-[1.8px]  gap-[10px]">
+                      <div className="flex gap-1">
+                        <label className="h-[70px] w-[100px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+                          {newTeamMember.icon ? (
+                            <img
+                              src={
+                                newTeamMember.icon
+                                  ? typeof newTeamMember.icon === "string"
+                                    ? newTeamMember.icon
+                                    : URL.createObjectURL(newTeamMember.icon)
+                                  : ""
+                              }
+                              alt="preview"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
+                          )}
+                          {/* Hidden File Input */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleTeamImageChange} />
+                        </label>
+                        <div className=" w-[100%] h-[40px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
+                          <input
+                            className="w-[100%] font-[500] rounded-[8px] px-[9px] outline-none h-[100%]"
+                            type="text"
+                            id=""
+                            placeholder="Title "
+                            name="title"
+                            value={newTeamMember.name}
+                            onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
                           />
-                        ) : (
-                          <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
-                        )}
-                        {/* Hidden File Input */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleTeamImageChange} />
-                      </label>
-                      <div className=" w-[100%] h-[40px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
-                        <input
-                          className="w-[100%] font-[500] rounded-[8px] px-[9px] outline-none h-[100%]"
-                          type="text"
-                          id=""
-                          placeholder="Title "
-                          name="name"
-                          value={newTeamMember.name}
-                          onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
-                        />
+                        </div>
                       </div>
 
                       <div className="w-[100%]  flex border-[#007e2c] overflow-hidden border-[1.8px] h-[100px] rounded-[8px]">
@@ -828,16 +844,17 @@ export default function Landing() {
 
                     {Array.isArray(teams) && teams.map((member, index) => (
                       <div key={index} className="flex flex-col border-[#007e2c] border-[1.8px] p-[10px] rounded-lg w-[320px] gap-[10px]">
-                        <div className="h-[200px] w-[100%] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+                        <div className="flex gap-1">
+                          <div className="h-[70px] w-[100px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
 
-                          <img src={member.image} alt={member.name} className="h-full w-full object-cover" />
+                            <img src={member.icon} alt={member.title} className="h-full w-full object-cover" />
+                          </div>
+                          <div className=" w-[100%] h-[40px]  px-[10px] py-[5px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-y-auto">
+                            <p>
+                              {member.title}
+                            </p>
+                          </div>
                         </div>
-                        <div className=" w-[100%] h-[40px]  px-[10px] py-[5px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-y-auto">
-                          <p>
-                            {member.name}
-                          </p>
-                        </div>
-
                         <div className="w-[100%] flex overflow-y-auto px-[10px] border-[#007e2c] border-[1.8px] h-[100px] justify-center items-center  rounded-[8px]">
                           <p>
                             {member.description}
@@ -865,74 +882,6 @@ export default function Landing() {
 
                 </div>
 
-
-
-                <div className=' flex w-[100%] border-t-[1.5px]  border-dashed h-[10px] border-[#007e2c]'>
-
-                </div>
-                <div className=" flex  w-[100%]  flex-col  gap-[20px] ">
-                  <p className="font-[500] text-[30px] font-Montserrat">What we do</p>
-
-                  <div className="flex gap-[20px] flex-wrap ">
-                    <div className="flex flex-col w-[350px]  p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
-                      <div className=' flex w-[100%] gap-[10px]'>
-
-
-                      </div>
-
-                      <div className="w-[100%] flex border-[#007e2c] border-[1.8px] h-[50px] rounded-[8px]">
-                        <input
-                          className="w-[100%] font-[400] rounded-[8px] px-[9px] items-center flex justify-center  outline-none h-[100%]"
-                          type="text"
-                          placeholder='Description'
-                          name="description"
-                          value={newTestimonial.description}
-                          onChange={(e) => setNewTestimonial({ ...newTestimonial, description: e.target.value })}
-                        />
-                      </div>
-                      <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
-                        onClick={handleAddTestimonial}
-                      >
-                        <p>Submit</p>
-                      </div>
-                    </div>
-
-                    {testimonials?.map((item, index) => (
-                      <div key={index} className="flex flex-col w-[380px] border-[1.8px] border-[#007e2c]   p-[14px] rounded-lg gap-[10px]">
-                        <div className=' flex w-[100%] gap-[10px]'>
-
-
-                        </div>
-
-                        <div className="w-[100%] flex border-[#007e2c] border-[1.8px] h-[50px] rounded-[8px]">
-                          <div
-                            className="w-[100%] font-[400] rounded-[8px] p-[9px] outline-none h-[100%]  overflow-y-auto "
-                          >
-                            {item?.description}
-                          </div>
-                        </div>
-                        <div className="w-[100%] h-[40px]  justify-between rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]   active:scale-95 transition-transform duration-150">
-                          <button className='  text-[19px] w-[77%] bs-mix-green justify-center items-center rounded-[5px] py-[6px] text-[#ffffff]'
-                            onClick={() => handleEditTestimonial(item)}
-                          >
-                            <i className="fa-solid fa-pen-to-square"></i>
-                          </button>
-                          <button className='w-[20%]  text-[19px] bg-[#fa0000] justify-center items-center rounded-[5px] py-[6px] text-[#ffffff] ]'
-                            onClick={() => {
-                              setDeleteData({ type: "testimonial", id: item._id });
-                              setIsDelOpen(true);
-                            }}
-                          >
-                            <i className="fa-solid fa-trash-can"></i>
-                          </button>
-
-                        </div>
-                      </div>
-
-                    ))}
-                  </div>
-
-                </div>
                 <div className=' flex w-[100%] border-t-[1.5px]  border-dashed  border-[#007e2c]'>
 
                 </div>
@@ -942,34 +891,7 @@ export default function Landing() {
                   <p className="font-[500] text-[30px] font-Montserrat">
                     Innovation in Manufacturing</p>
                   <div className="flex w-[100%] flex-wrap gap-[20px] ">
-                    <div className=" flex  rounded-[8px] border-[#007e2c] border-[1.8px] p-[10px] flex-col gap-[10px]">
-
-
-                      <label className="h-[200px] w-[230px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-                        {newFAQ.image ? (
-                          <img
-                            src={
-                              newFAQ.image
-                                ? typeof newFAQ.image === "string"
-                                  ? newFAQ.image
-                                  : URL.createObjectURL(newFAQ.image)
-                                : ""
-                            }
-                            alt="preview"
-                            className="h-full w-full object-cover"
-
-                          />
-                        ) : (
-                          <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
-                        )}
-                        {/* Hidden File Input */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleFaqImageChange}
-                        />
-                      </label>
+                    <div className=" flex  rounded-[8px] h-fit border-[#007e2c] border-[1.8px] p-[10px] flex-col gap-[10px]">
                       <div className=" w-[100%] h-[45px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
                         <input
                           className="w-[100%] font-[500] rounded-[8px] px-[9px] outline-none h-[100%]"
@@ -977,8 +899,8 @@ export default function Landing() {
                           id=""
                           placeholder="Number"
                           name="count"
-                          value={newFAQ.count}
-                          onChange={(e) => setNewFAQ({ ...newFAQ, count: e.target.value })}
+                          value={newCalculation.count}
+                          onChange={(e) => setNewCalculation({ ...newCalculation, count: e.target.value })}
                         />
                       </div>
                       <div className=" w-[100%] h-[45px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
@@ -988,34 +910,19 @@ export default function Landing() {
                           id=""
                           placeholder="Title"
                           name="name"
-                          value={newFAQ.name}
-                          onChange={(e) => setNewFAQ({ ...newFAQ, name: e.target.value })}
+                          value={newCalculation.name}
+                          onChange={(e) => setNewCalculation({ ...newCalculation, name: e.target.value })}
                         />
                       </div>
                       <div className="w-[100%] h-[40px] rounded-md  cursor-pointer flex justify-center items-center text-[#fff]   font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
-                        onClick={handleAddFAQ}>
+                        onClick={handleAddCalculation}>
 
                         <p>Submit</p>
                       </div>
                     </div>
 
-                    {faqs?.map((item, index) => (
-                      <div key={index} className=" flex  rounded-[8px] border-[#007e2c] border-[1.8px] p-[10px] flex-col gap-[10px]">
-
-
-                        <label className="h-[200px] w-[230px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-
-                          <img src={item?.image} alt="preview" className="h-full w-full object-cover" />
-
-
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageUploadteam}
-                          />
-
-                        </label>
+                    {Array.isArray(calculation) && calculation.map((item, index) => (
+                      <div key={index} className="w-[250px] flex  rounded-[8px] border-[#007e2c] border-[1.8px] p-[10px] flex-col gap-[10px]">
                         <div className=" w-[100%] h-[45px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
                           {item?.count}
                         </div>
@@ -1024,7 +931,7 @@ export default function Landing() {
                         </div>
                         <div className="w-[100%] h-[40px] gap-[10px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]   active:scale-95 transition-transform duration-150">
                           <button className='  text-[19px] w-[77%] bs-mix-green justify-center items-center rounded-[5px] py-[6px] text-[#ffffff]'
-                            onClick={() => handleEditFAQ(item)}
+                            onClick={() => handleEditCalculation(item)}
                           >
                             <i className="fa-solid fa-pen-to-square"></i>
                           </button>
@@ -1036,7 +943,6 @@ export default function Landing() {
                           >
                             <i className="fa-solid fa-trash-can"></i>
                           </button>
-
                         </div>
                       </div>
                     ))}
@@ -1047,24 +953,32 @@ export default function Landing() {
 
 
                 <div className=" flex  w-[100%]  flex-col  gap-[20px] ">
-                  <p className="font-[500] text-[30px] font-Montserrat">Why Us</p>
+                  <p className="font-[500] text-[30px] font-Montserrat">Why Choose Us</p>
 
                   <div className="flex gap-[20px] flex-wrap ">
-                    <div className="flex flex-col w-[310px]  p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
-                      <div className=' flex w-[100%] gap-[10px]' >
-                        <label className="h-[180px] w-[100%] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-                          {newBlog.image ? (
+                    <div className="flex flex-col w-[310px] h-fit p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
+                      <div className=' flex w-[100%] gap-[10px] h-[180px] border-[#007e2c] border-[1.8px]  justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative' >
+                        <label className=" w-[100%] flex justify-center items-center">
+
+                          {/* <label
+                            htmlFor=""
+                            className="h-[50px] w-[50px] border-[#007e2c] border-[1.8px] top-2 left-2 rounded-[8px] cursor-pointer overflow-hidden absolute"
+                          >
+                            <input type="file" accept="hidden" className="hidden" />
+                            <i className="fa-solid fa-plus text-[20px] text-[#007e2c] w-full h-full flex justify-center items-center"></i>
+                          </label> */}
+
+                          {whyData.image ? (
                             <img
                               src={
-                                newBlog.image
-                                  ? typeof newBlog.image === "string"
-                                    ? newBlog.image
-                                    : URL.createObjectURL(newBlog.image)
+                                whyData.image
+                                  ? typeof whyData.image === "string"
+                                    ? whyData.image
+                                    : URL.createObjectURL(whyData.image)
                                   : ""
                               }
                               alt="preview"
                               className="h-full w-full object-cover"
-
                             />
                           ) : (
                             <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
@@ -1074,64 +988,76 @@ export default function Landing() {
                             type="file"
                             accept="image/*"
                             className="hidden"
-                            onChange={handleBlogImageChange} />
+                            onChange={handleWhyUsImageChange} />
+                        </label>
+
+                        <label className="h-[50px] w-[50px] border-[#007e2c] border-[1.8px] top-2 left-2 rounded-[8px] cursor-pointer overflow-hidden absolute">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleIconChange}
+                          />
+                          {whyData.icon ? (
+                            <img
+                              src={
+                                typeof whyData.icon === "string"
+                                  ? whyData.icon
+                                  : URL.createObjectURL(whyData.icon)
+                              }
+                              alt="icon"
+                              className="h-full w-auto"
+                            />
+                          ) : (
+                            <i className="fa-solid fa-plus text-[20px] text-[#007e2c] w-full h-full flex justify-center items-center"></i>
+                          )}
                         </label>
                       </div>
-                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden px-[10px] border-[1.8px] h-[40px] rounded-[8px]">
-                        <input type="text "
-                          placeholder=" tag"
-                          className=" w-[100%] h-[100%]"
-                          name="title"
-                          value={newBlog.title}
-                          onChange={(e) => setNewBlog({ ...newBlog, title: e.target.value })}
-                        />
-                      </div>
-                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden text-[19px] px-[10px] border-[1.8px] h-[70px] rounded-[8px]">
+
+                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden text-[19px] px-[10px] border-[1.8px] h-[50px] rounded-[8px]">
                         <input type="text "
                           placeholder=" Title"
                           className=" w-[100%] h-[100%]"
-                          name="category"
-                          value={newBlog.category}
-                          onChange={(e) => setNewBlog({ ...newBlog, category: e.target.value })}
+                          name="title"
+                          value={whyData.title}
+                          onChange={(e) => setWhyData({ ...whyData, title: e.target.value })}
                         />
                       </div>
                       <div className="w-[100%] flex border-[#007e2c] overflow-hidden p-[5px] border-[1.8px] h-[120px] overflow-y-auto rounded-[8px]">
                         <textarea type="text "
-                          placeholder=" Title"
+                          placeholder=" Description"
                           className=" w-[100%] h-[100%] outline-none"
                           name="description"
-                          value={newBlog.description}
-                          onChange={(e) => setNewBlog({ ...newBlog, description: e.target.value })}
+                          value={whyData.description}
+                          onChange={(e) => setWhyData({ ...whyData, description: e.target.value })}
                         > </textarea>
                       </div>
                       <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
-                        onClick={handleAddBlog}
+                        onClick={handleSubmitWhyUs}
                       >
                         <p>Submit</p>
                       </div>
                     </div>
-                    {blogs?.map((item, index) => (
+                    {Array.isArray(blogs) && blogs.map((item, index) => (
                       <div key={index} className="flex flex-col w-[310px]  p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
                         <div className=' flex w-[100%] gap-[10px]' >
                           <label className="h-[180px] w-[100%] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-
+                            <label
+                              htmlFor=""
+                              className="h-[50px] w-[50px] border-[#007e2c] border-[1.8px] top-2 left-2 rounded-[8px] cursor-pointer overflow-hidden absolute"
+                            >
+                              <input type="file" accept="hidden" className="hidden" />
+                              <img src={item?.icon} alt="" className="h-[50px]" />
+                              {/* <i className="fa-solid fa-plus text-[20px] text-[#007e2c] w-full h-full flex justify-center items-center"></i> */}
+                            </label>
                             <img src={item?.image} alt="preview" className="h-full w-full object-cover" />
 
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) =>
-                                setNewBlog({ ...newBlog, image: e.target.files[0] })
-                              } />
                           </label>
 
                         </div>
-                        <div className="w-[100%] flex border-[#007e2c] overflow-hidden px-[10px] border-[1.8px] h-[40px] rounded-[8px]">
+
+                        <div className="w-[100%] flex border-[#007e2c] text-[17px] items-center overflow-y-auto px-[10px] border-[1.8px] h-[50px] rounded-[8px]">
                           <p>{item?.title}</p>
-                        </div>
-                        <div className="w-[100%] flex border-[#007e2c] text-[17px] items-center overflow-y-auto px-[10px] border-[1.8px] h-[70px] rounded-[8px]">
-                          <p>{item?.category}</p>
                         </div>
                         <div className="w-[100%] flex border-[#007e2c] overflow-y-auto p-[5px] border-[1.8px] h-[120px] rounded-[8px]">
                           <p>
@@ -1157,6 +1083,64 @@ export default function Landing() {
                       </div>
                     ))}
                   </div>
+
+                </div>
+
+                <div className=' flex w-[100%] border-t-[1.5px]  border-dashed  border-[#007e2c]'>
+                </div>
+
+                <div className=" flex  w-[100%]  flex-col  gap-[20px] ">
+                  <p className="font-[500] text-[30px] font-Montserrat">FAQ</p>
+
+                  <div className="flex gap-[20px] flex-wrap">
+                    <div className="flex w-full flex-col md:flex-row justify-between gap-6 p-4 border-[1.8px] border-[#007e2c] rounded-lg">
+                      {/* Left: Form Section */}
+                      <div className="flex flex-col w-full md:w-2/2 gap-4">
+                        {/* Question */}
+                        <div className="w-full border-[1.8px] border-[#007e2c] h-[50px] rounded-[8px] px-3 flex items-center">
+                          <input
+                            type="text"
+                            placeholder="Question"
+                            className="w-full h-full outline-none"
+                            name="question"
+                            value={newFaq.question}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+
+                        {/* Answer */}
+                        <div className="w-full border-[1.8px] border-[#007e2c] h-[80px] rounded-[8px] p-2">
+                          <textarea
+                            placeholder="Answer"
+                            className="w-full h-full resize-none outline-none"
+                            name="answer"
+                            value={newFaq.answer}
+                            onChange={handleInputChange}
+                          ></textarea>
+                        </div>
+
+                        {/* Submit Button */}
+                        <div
+                          className="w-full h-[40px] rounded-md cursor-pointer flex justify-center items-center text-white font-semibold bs-mix-green active:scale-95 transition-transform"
+                          onClick={handleSubmitFaq}
+                        >
+                          <p>Submit</p>
+                        </div>
+                        {Array.isArray(faqs) && faqs.map((faq, index) => (
+                        <div key={index} className="w-full flex flex-col gap-3 p-4 border-[1.8px] border-[#007e2c] rounded-lg">
+                          <div className="w-full border-[1.8px] border-[#007e2c] h-[50px] rounded-[8px] px-3 flex items-center">
+                            {faq.question}
+                          </div>
+                          <div className="w-full border-[1.8px] border-[#007e2c] h-[80px] rounded-[8px] px-3 flex items-center">
+                            {faq.answer}
+                          </div>
+                        </div>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
 
                 </div>
 
@@ -1187,89 +1171,54 @@ export default function Landing() {
 
 
                           <div
-                            className="border-[2px] w-[100%] border-[#007e2c] rounded-[8px] h-[100px] p-[10px]"
-                          > <textarea className=' flex w-[100%] h-[100%] outline-none'
-                            placeholder='Main Title'
+                            className="border-[2px] w-[100%] border-[#007e2c] rounded-[8px] h-[50px] p-[10px]"
+                          > <input className=' flex w-[100%] h-[100%] outline-none'
+                            placeholder='Title'
                             type='text'
-                            name="headDescription"
-                            value={headDescription}
-                            onChange={(e) => setHeadDescription(e.target.value)}
-                          ></textarea>
+                            name="title"
+                            value={aboutData.title}
+                            onChange={handleChange}
+                          ></input>
                           </div>
                         </div>
                         <div className=' flex flex-col  gap-[10px] w-[100%] '>
-                          <div className=' flex  text-[20px] w-[100%] font-[600] '> Our Vission And Mission </div>
-                          {sections.map((section, index) => (
-                            <div key={index} className=' flex   border-[2px] p-[10px] rounded-[9px] border-[#007e2c]  gap-[10px]  w-[100%] '>
-
-                              <div className=' flex-col  gap-[10px] flex w-[100%]'>
-                                <div className=' overflow-hidden p-[8px]  h-[50px] w-[100%] rounded-[9px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[5px] flex '>
-                                  <input className=' flex w-[100%] h-[100%]'
-                                    type='text'
-                                    placeholder="Title"
-                                    name="subTitle"
-                                    value={section.subTitle}
-                                    onChange={(e) => handleSectionChange(index, "subTitle", e.target.value)}
-                                  />
-                                </div>
-                                <div className='  h-[120px] w-[100%] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[9px]  overflow-x-hiddenflex '>
-
-                                  <textarea className=' flex h-[100%] w-[100%] rounded-[9px] outline-none p-[6px]'
-                                    placeholder="Description"
-                                    name="description"
-                                    value={section.description}
-                                    onChange={(e) => handleSectionChange(index, "description", e.target.value)}>
-                                  </textarea>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          {/* {sections.map((section, index) => (
-                            <div key={index} className="border-[#007e2c] border-[1.8px] p-2 rounded">
-                                <label className="h-[150px] w-[150px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-                              {savedImages ? (
-                                <img src={savedImages} alt="preview" className="h-full w-full object-cover" />
-                              ) : (
-                                <i className="fa-solid text-[20px] text-[#007e2c] fa-plu"></i>
-                              )}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleIconUpload}
-                              />
-                            </label>
-                              <input type="text" placeholder="Subtitle" className="w-full p-1 border-[#007e2c] border rounded" value={section.subTitle} onChange={(e) => {
-                                const newSections = [...sections];
-                                newSections[index].subTitle = e.target.value;
-                                setSections(newSections);
-                              }} />
-                              <textarea placeholder="Description" className="w-full p-1 border-[#007e2c] border rounded mt-1" value={section.description} onChange={(e) => {
-                                const newSections = [...sections];
-                                newSections[index].description = e.target.value;
-                                setSections(newSections);
-                              }}></textarea>
-                            </div>
-                          ))} */}
-                          <button onClick={addSection} className="mt-3 bg-[#007e2c] text-white px-3 py-1 rounded">+ Add Section</button>
+                          <div className='jodit'>
+                            <JoditEditor
+                              value={aboutData.description}
+                              onChange={handleDescriptionChange}
+                              config={{
+                                height: 300,
+                                minHeight: 204,
+                                readonly: false,
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className=" w-[fit]">
+                      <div className="w-fit">
                         <label className="h-[370px] w-[370px] border-[#007e2c] border-[2px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
-                          {newAbout.image ? (
-                            <img src={URL.createObjectURL(newAbout.image)} alt="preview" className="h-full w-full object-cover" />
+                          {aboutData.image ? (
+                            <img
+                              src={
+                                typeof aboutData.image === "string"
+                                  ? aboutData.image
+                                  : URL.createObjectURL(aboutData.image)
+                              }
+                              alt="preview"
+                              className="h-full w-full object-cover"
+                            />
                           ) : (
                             <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
                           )}
-                          {/* Hidden File Input */}
                           <input
                             type="file"
                             accept="image/*"
                             className="hidden"
-                            onChange={handleAboutImageChange}
+                            onChange={handleImageChange}
                           />
                         </label>
                       </div>
+
                     </div>
                   </div>
                 </div>

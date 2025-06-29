@@ -3,8 +3,8 @@ import Cookies from 'js-cookie';
 
 
 // export const BaseURL = "http://localhost:4000/api/v2";
-// export const BaseURL = "http://localhost:3000/api/v2/vinayak";
-export const BaseURL = "https://server.grafizen.in/api/v2/vinayak"
+export const BaseURL = "http://localhost:3000/api/v2/chhapia";
+// export const BaseURL = "https://server.grafizen.in/api/v2/chhapia"
 
 
 const defaultHeaders = {

@@ -57,7 +57,7 @@ export default function Login() {
 
     try {
       // Call login API
-      const response = await axios.post("https://server.grafizen.in/api/v2/vinayak/auth/admin/login", formData); 
+      const response = await axios.post("http://localhost:3000/api/v2/chhapia/auth/admin/login", formData); 
       console.log("Login API Response:", response); 
       const user = response.data?.user;
       console.log('user', user)
