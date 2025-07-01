@@ -13,6 +13,10 @@ import { getFaqAction, getBlogAction, getTeamAction, getTestimonialAction, addFa
 import { ApiDelete, ApiGet, ApiPost, ApiPut } from "../../helper/axios";
 import uploadToHPanel from "../../helper/uploadToHpanel";
 
+const onChange = (date, dateString) => {
+  console.log(date, dateString);
+};
+
 export default function Landing() {
   const [selectedmodalopen, setModalOpen] = useState(false);
   const [blogmodalopen, setBlogModalOpen] = useState(false);
@@ -54,6 +58,22 @@ export default function Landing() {
 
   const [selectedImageTeam, setSelectedImageTeam] = useState(null);
   const [deleteData, setDeleteData] = useState({ type: "", id: "" });
+  const [blogData, setBlogData] = useState({
+    image: null,
+    title: "",
+    tag: "",
+    description: "",
+    date: new Date(),
+    readTime: "",
+  });
+
+    const [coreData, setCoreData] = useState({
+    icon: null,
+    title: "",
+    description: "",
+  });
+
+    const [coreList, setCoreList] = useState([]);
 
 
   console.log('testimonials', testimonials)
@@ -114,6 +134,21 @@ export default function Landing() {
   useEffect(() => {
     fetchWhyList();
   }, []);
+
+    useEffect(() => {
+    fetchCoreValues();
+  }, []);
+
+  const fetchCoreValues = async () => {
+    try {
+      const res = await ApiGet("/admin/core-value");
+      if (res.data) {
+        setCoreList(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch core values:", error);
+    }
+  };
 
 
 
@@ -439,7 +474,46 @@ export default function Landing() {
   const handleBlogImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setNewBlog((prev) => ({ ...prev, image: file }));
+      setBlogData((prev) => ({ ...prev, image: file }));
+    }
+  };
+
+  const handleBlogChange = (e) => {
+    const { name, value } = e.target;
+    setBlogData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDateChange = (date) => {
+    setBlogData((prev) => ({ ...prev, date }));
+  };
+
+  const handleBlogSubmit = async () => {
+    let imageUrl = blogData.image;
+
+    if (imageUrl && typeof imageUrl !== "string") {
+      imageUrl = await uploadToHPanel(imageUrl);
+      if (!imageUrl) {
+        alert("Image upload failed.");
+        return;
+      }
+    }
+
+    const payload = {
+      title: blogData.title,
+      tag: blogData.tag,
+      description: blogData.description,
+      date: blogData.date.toISOString(),
+      readTime: blogData.readTime,
+      image: imageUrl,
+    };
+
+    try {
+      const response = await ApiPost("/admin/blog", payload);
+      alert("Blog submitted!");
+      console.log(response);
+    } catch (error) {
+      console.error("Blog submission failed", error);
+      alert("Submission failed");
     }
   };
 
@@ -487,8 +561,6 @@ export default function Landing() {
     }
   };
 
-
-
   const handleEditTestimonial = (item) => {
     setNewTestimonial({
       _id: item._id,
@@ -503,17 +575,50 @@ export default function Landing() {
   };
 
 
-  const handleFaqImageUpload = (e, index) => {
-    const newImages = [...newFaq.images];
-    newImages[index] = e.target.files[0];
-    setNewFaq({ ...newFaq, images: newImages });
+  const handleCoreIconChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCoreData((prev) => ({ ...prev, icon: file }));
+    }
   };
 
-  const handleRemoveImage = (index) => {
-    const newImages = [...newFaq.images];
-    newImages[index] = null;
-    setNewFaq({ ...newFaq, images: newImages });
+   const handleAddCore = async () => {
+    if (!coreData.title || !coreData.description) {
+      alert("Please fill in title and description");
+      return;
+    }
+
+    try {
+                let iconUrl = coreData.icon;
+
+      if (iconUrl && typeof iconUrl !== "string") {
+        iconUrl = await uploadToHPanel(iconUrl);
+        if (!iconUrl) {
+          alert("Image upload failed.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const payload = {
+        image: iconUrl,
+        title: coreData.title,
+        description: coreData.description,
+      };
+
+      const res = await ApiPost("/admin/core-value", payload);
+      if (res.data) {
+        fetchCoreValues();
+        setCoreData({ icon: null, title: "", description: "" });
+      } else {
+        alert("Failed to submit core value.");
+      }
+    } catch (error) {
+      console.error("Error adding core value:", error);
+    }
   };
+
+
 
   const handleSubmitFaq = async (e) => {
     e.preventDefault();
@@ -612,7 +717,7 @@ export default function Landing() {
           url = `/admin/what-we-do/${deleteData.id}`;
           break;
         case "blog":
-          url = `/admin/why-us/${deleteData.id}`;
+          url = `/admin/why-choose-us/${deleteData.id}`;
           break;
         case "hero":
           url = `/admin/hero-section/${deleteData.id}`;
@@ -1038,7 +1143,7 @@ export default function Landing() {
                         <p>Submit</p>
                       </div>
                     </div>
-                    {Array.isArray(blogs) && blogs.map((item, index) => (
+                    {Array.isArray(whyData) && whyData.map((item, index) => (
                       <div key={index} className="flex flex-col w-[310px]  p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
                         <div className=' flex w-[100%] gap-[10px]' >
                           <label className="h-[180px] w-[100%] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
@@ -1127,14 +1232,14 @@ export default function Landing() {
                           <p>Submit</p>
                         </div>
                         {Array.isArray(faqs) && faqs.map((faq, index) => (
-                        <div key={index} className="w-full flex flex-col gap-3 p-4 border-[1.8px] border-[#007e2c] rounded-lg">
-                          <div className="w-full border-[1.8px] border-[#007e2c] h-[50px] rounded-[8px] px-3 flex items-center">
-                            {faq.question}
+                          <div key={index} className="w-full flex flex-col gap-3 p-4 border-[1.8px] border-[#007e2c] rounded-lg">
+                            <div className="w-full border-[1.8px] border-[#007e2c] h-[50px] rounded-[8px] px-3 flex items-center">
+                              {faq.question}
+                            </div>
+                            <div className="w-full border-[1.8px] border-[#007e2c] h-[80px] rounded-[8px] px-3 flex items-center">
+                              {faq.answer}
+                            </div>
                           </div>
-                          <div className="w-full border-[1.8px] border-[#007e2c] h-[80px] rounded-[8px] px-3 flex items-center">
-                            {faq.answer}
-                          </div>
-                        </div>
                         ))}
                       </div>
                     </div>
@@ -1143,6 +1248,301 @@ export default function Landing() {
 
 
                 </div>
+
+
+                <div className=' flex w-[100%] border-t-[1.5px]  border-dashed  border-[#007e2c]'>
+                </div>
+
+
+                <div className=" flex  w-[100%]  flex-col  gap-[20px] ">
+                  <p className="font-[500] text-[30px] font-Montserrat">Blogs</p>
+
+                  <div className="flex gap-[20px] flex-wrap ">
+                    <div className="flex flex-col w-[310px] h-fit p-[14px] rounded-lg border-[#007e2c] border-[1.8px] gap-[10px]">
+                      <div className=' flex w-[100%] gap-[10px] h-[180px] border-[#007e2c] border-[1.8px]  justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative' >
+                        <label className=" w-[100%] flex justify-center items-center">
+
+                          {/* <label
+                            htmlFor=""
+                            className="h-[50px] w-[50px] border-[#007e2c] border-[1.8px] top-2 left-2 rounded-[8px] cursor-pointer overflow-hidden absolute"
+                          >
+                            <input type="file" accept="hidden" className="hidden" />
+                            <i className="fa-solid fa-plus text-[20px] text-[#007e2c] w-full h-full flex justify-center items-center"></i>
+                          </label> */}
+
+                          {blogData.image ? (
+                            <img
+                              src={
+                                blogData.image
+                                  ? typeof blogData.image === "string"
+                                    ? blogData.image
+                                    : URL.createObjectURL(blogData.image)
+                                  : ""
+                              }
+                              alt="preview"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
+                          )}
+                          {/* Hidden File Input */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleBlogImageChange} />
+                        </label>
+
+                        {/* <label className="h-[50px] w-[50px] border-[#007e2c] border-[1.8px] top-2 left-2 rounded-[8px] cursor-pointer overflow-hidden absolute">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleIconChange}
+                          />
+                          {whyData.icon ? (
+                            <img
+                              src={
+                                typeof whyData.icon === "string"
+                                  ? whyData.icon
+                                  : URL.createObjectURL(whyData.icon)
+                              }
+                              alt="icon"
+                              className="h-full w-auto"
+                            />
+                          ) : (
+                            <i className="fa-solid fa-plus text-[20px] text-[#007e2c] w-full h-full flex justify-center items-center"></i>
+                          )}
+                        </label> */}
+                      </div>
+
+                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden text-[19px] px-[10px] border-[1.8px] h-[50px] rounded-[8px]">
+                        <input type="text "
+                          placeholder="Tag"
+                          className=" w-[100%] h-[100%]"
+                          name="tag"
+                          value={blogData.tag}
+                          onChange={handleBlogChange}
+                        />
+                      </div>
+
+                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden text-[19px] px-[10px] border-[1.8px] h-[50px] rounded-[8px]">
+                        <input type="text "
+                          placeholder=" Title"
+                          className=" w-[100%] h-[100%]"
+                          name="title"
+                          value={blogData.title}
+                          onChange={handleBlogChange}
+                        />
+                      </div>
+                      <div className="w-[100%] flex border-[#007e2c] overflow-hidden p-[5px] border-[1.8px] h-[120px] overflow-y-auto rounded-[8px]">
+                        <textarea type="text "
+                          placeholder=" Description"
+                          className=" w-[100%] h-[100%] outline-none"
+                          name="description"
+                          value={blogData.description}
+                          onChange={handleBlogChange}
+                          rows={4}
+                        > </textarea>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="border-[#007e2c] border-[2px]  rounded outline-none  hover:outline-none focus:border-[#007e2c] focus:ring-0">
+                          <DatePicker selected={blogData.date}
+                            onChange={handleDateChange}
+                            className="outline-none" />
+                        </div>
+                        <div className=" border-[#007e2c] border-[2px]  rounded outline-none focus:border-[#007e2c] focus:ring-0">
+                          <input
+                            type="text"
+                            className="w-[100px]"
+                            name="readTime"
+                            value={blogData.readTime}
+                            onChange={handleBlogChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
+                        onClick={handleBlogSubmit}
+                      >
+                        <p>Submit</p>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className=' flex w-[100%] border-t-[1.5px]  border-dashed h-[10px] border-[#007e2c]'>
+
+                </div>
+                <div className=" flex  w-[100%]  flex-col mt-[10px] gap-[20px] ">
+                  <p className="font-[500] text-[30px] font-Montserrat">Our Core Values </p>
+
+                  <div className="flex gap-[20px] flex-wrap ">
+                    <div className="flex flex-col h-fit w-[320px] p-[14px] rounded-lg border-[#007e2c] border-[1.8px]  gap-[10px]">
+                      <div className="flex gap-1">
+                        <label className="h-[70px] w-[100px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+                          {coreData.icon ? (
+                            <img
+                              src={
+                                coreData.icon
+                                  ? typeof coreData.icon === "string"
+                                    ? coreData.icon
+                                    : URL.createObjectURL(coreData.icon)
+                                  : ""
+                              }
+                              alt="preview"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
+                          )}
+                          {/* Hidden File Input */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleCoreIconChange} />
+                        </label>
+                        <div className=" w-[100%] h-[40px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
+                          <input
+                            className="w-[100%] font-[500] rounded-[8px] px-[9px] outline-none h-[100%]"
+                            type="text"
+                            id=""
+                            placeholder="Title "
+                            name="title"
+                            value={coreData.title}
+                            onChange={(e) => setCoreData({ ...coreData, title: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="w-[100%]  flex border-[#007e2c] overflow-hidden border-[1.8px] h-[100px] rounded-[8px]">
+                        <textarea placeholder="Details" className=" flex w-[100%] h-[100%] p-[10px] outline-none"
+                          name="description"
+                          value={coreData.description}
+                          onChange={(e) => setCoreData({ ...coreData, description: e.target.value })}
+                        ></textarea>
+                      </div>
+                      <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]  font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
+                        onClick={handleAddCore}
+                      >
+                        <p>Submit</p>
+                      </div>
+                    </div>
+
+                    {Array.isArray(coreList) && coreList.map((member, index) => (
+                      <div key={index} className="flex flex-col border-[#007e2c] border-[1.8px] p-[10px] rounded-lg w-[320px] gap-[10px]">
+                        <div className="flex gap-1">
+                          <div className="h-[70px] w-[100px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+
+                            <img src={member.image} alt={member.title} className="h-full w-full object-cover" />
+                          </div>
+                          <div className=" w-[100%] h-[40px]  px-[10px] py-[5px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-y-auto">
+                            <p>
+                              {member.title}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-[100%] flex overflow-y-auto px-[10px] border-[#007e2c] border-[1.8px] h-[100px] justify-center items-center  rounded-[8px]">
+                          <p>
+                            {member.description}
+                          </p>
+                        </div>
+                        <div className="w-[100%] h-[40px]  rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]   active:scale-95 transition-transform duration-150">
+                          <button className='  text-[19px] w-[77%] bs-mix-green justify-center items-center rounded-[5px] py-[6px] text-[#ffffff]'
+                            onClick={() => handleEditTeam(member)}
+                          >
+                            <i className="fa-solid fa-pen-to-square"></i>
+                          </button>
+                          <button className='w-[20%]  text-[19px] bg-[#fa0000] justify-center items-center rounded-[5px] py-[6px] text-[#ffffff] ]'
+                            onClick={() => {
+                              setDeleteData({ type: "team", id: member._id });
+                              setIsDelOpen(true);
+                            }}
+                          >
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                </div>
+
+
+                <div className=' flex w-[100%] border-t-[1.5px]  border-dashed h-[10px] border-[#007e2c]'>
+
+                </div>
+                <div className=" flex  w-[100%]  flex-col mt-[10px] gap-[20px] ">
+                  <p className="font-[500] text-[30px] font-Montserrat">What Our Clients Say About Chhapia Associates</p>
+
+                  <div className="flex gap-[20px] flex-wrap ">
+                    <div className="flex flex-col h-fit w-[320px] p-[14px] rounded-lg border-[#007e2c] border-[1.8px]  gap-[10px]">
+                      <div className="flex gap-1">
+
+                        <div className=" w-[100%] h-[40px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
+
+                        </div>
+                      </div>
+
+                      <div className="w-[100%]  flex border-[#007e2c] overflow-hidden border-[1.8px] h-[100px] rounded-[8px]">
+                        <textarea placeholder="Details" className=" flex w-[100%] h-[100%] p-[10px] outline-none"
+                          name="description"
+                          value={newTeamMember.description}
+                          onChange={(e) => setNewTeamMember({ ...newTeamMember, description: e.target.value })}
+                        ></textarea>
+                      </div>
+                      <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]  font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
+                        onClick={handleAddTeam}
+                      >
+                        <p>Submit</p>
+                      </div>
+                    </div>
+
+                    {Array.isArray(teams) && teams.map((member, index) => (
+                      <div key={index} className="flex flex-col border-[#007e2c] border-[1.8px] p-[10px] rounded-lg w-[320px] gap-[10px]">
+                        <div className="flex gap-1">
+                          <div className="h-[70px] w-[100px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+
+                            <img src={member.icon} alt={member.title} className="h-full w-full object-cover" />
+                          </div>
+                          <div className=" w-[100%] h-[40px]  px-[10px] py-[5px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-y-auto">
+                            <p>
+                              {member.title}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-[100%] flex overflow-y-auto px-[10px] border-[#007e2c] border-[1.8px] h-[100px] justify-center items-center  rounded-[8px]">
+                          <p>
+                            {member.description}
+                          </p>
+                        </div>
+                        <div className="w-[100%] h-[40px]  rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]   font-[600]   active:scale-95 transition-transform duration-150">
+                          <button className='  text-[19px] w-[77%] bs-mix-green justify-center items-center rounded-[5px] py-[6px] text-[#ffffff]'
+                            onClick={() => handleEditTeam(member)}
+                          >
+                            <i className="fa-solid fa-pen-to-square"></i>
+                          </button>
+                          <button className='w-[20%]  text-[19px] bg-[#fa0000] justify-center items-center rounded-[5px] py-[6px] text-[#ffffff] ]'
+                            onClick={() => {
+                              setDeleteData({ type: "team", id: member._id });
+                              setIsDelOpen(true);
+                            }}
+                          >
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                </div>
+
 
               </div>
 

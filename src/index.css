@@ -33,10 +33,17 @@
 
 
 
+:where(.css-dev-only-do-not-override-77tu7h).ant-picker-outlined:focus, :where(.css-dev-only-do-not-override-77tu7h).ant-picker-outlined:focus-within {
+    border-color: transparent !important ;
+    box-shadow: none;
+    outline: 0;
+    background-color: #ffffff;
+}
 
+:where(.css-dev-only-do-not-override-77tu7h).ant-picker {
+    height: 20px !important;
 
-
-
+}
 
 
 .ck-editor__editable {
