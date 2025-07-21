@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo, useEffect, useSyncExternalStore } from "react";
 import { Header } from '../../Components/header/Header'
+import { Star, Quote } from 'lucide-react';
 import wdwssd from '../../../public/img/backhotel.avif'
 import JoditEditor from "jodit-react";
 import {
@@ -35,7 +36,7 @@ export default function Landing() {
   const [newCalculation, setNewCalculation] = useState({ name: "", count: "" });
   const [newTeamMember, setNewTeamMember] = useState({ name: "", description: "", icon: "" });
   const [newBlog, setNewBlog] = useState({ category: "", description: "", title: "", image: "" });
-  const [newTestimonial, setNewTestimonial] = useState({ image: "", description: "" });
+  const [   newTestimonial, setNewTestimonial] = useState({ image: "", description: "", name: "", profession: "", rating: "" });
   const [newHero, setNewHero] = useState({ image: "" });
   const [whyData, setWhyData] = useState({ image: null, title: '', description: '', icon: '' });
   const [aboutData, setAboutData] = useState({
@@ -67,13 +68,13 @@ export default function Landing() {
     readTime: "",
   });
 
-    const [coreData, setCoreData] = useState({
+  const [coreData, setCoreData] = useState({
     icon: null,
     title: "",
     description: "",
   });
 
-    const [coreList, setCoreList] = useState([]);
+  const [coreList, setCoreList] = useState([]);
 
 
   console.log('testimonials', testimonials)
@@ -135,7 +136,7 @@ export default function Landing() {
     fetchWhyList();
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     fetchCoreValues();
   }, []);
 
@@ -204,6 +205,23 @@ export default function Landing() {
 
       if (uploadedUrl) {
         setAboutData((prev) => ({ ...prev, image: uploadedUrl }));
+      } else {
+        alert("Image upload failed");
+        setPreviewImage(null);
+      }
+    }
+  };
+  const handleTestimonialImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Show preview while uploading
+      setPreviewImage(URL.createObjectURL(file));
+
+      // Upload to HPanel
+      const uploadedUrl = await uploadToHPanel(file);
+
+      if (uploadedUrl) {
+        setNewTestimonial((prev) => ({ ...prev, image: uploadedUrl }));
       } else {
         alert("Image upload failed");
         setPreviewImage(null);
@@ -566,6 +584,9 @@ export default function Landing() {
       _id: item._id,
       description: item.description,
       image: item.image,
+      profession: item.profession,
+      name: item?.name,
+      rating: item?.rating,
     });
   };
 
@@ -582,14 +603,14 @@ export default function Landing() {
     }
   };
 
-   const handleAddCore = async () => {
+  const handleAddCore = async () => {
     if (!coreData.title || !coreData.description) {
       alert("Please fill in title and description");
       return;
     }
 
     try {
-                let iconUrl = coreData.icon;
+      let iconUrl = coreData.icon;
 
       if (iconUrl && typeof iconUrl !== "string") {
         iconUrl = await uploadToHPanel(iconUrl);
@@ -666,7 +687,13 @@ export default function Landing() {
 
       const payload = {
         description: newTestimonial.description,
+        image: newTestimonial.image,
+        name: newTestimonial.name,
+        profession: newTestimonial.profession,
+        rating: newTestimonial.rating,
       };
+
+      console.log('payload', payload)
 
       if (newTestimonial._id) {
         dispatch(updateTestimonialAction(newTestimonial._id, payload));
@@ -674,7 +701,7 @@ export default function Landing() {
         dispatch(addTestimonialAction(payload));
       }
 
-      setNewTestimonial({ description: "" });
+      setNewTestimonial({ description: "", image: "", name: "", profession: "", rating: "" });
       dispatch(getTestimonialAction());
       alert("Data Added Successfully!");
     } catch (error) {
@@ -714,7 +741,7 @@ export default function Landing() {
           url = `/admin/calculation/${deleteData.id}`;
           break;
         case "testimonial":
-          url = `/admin/what-we-do/${deleteData.id}`;
+          url = `/admin/testimonial/${deleteData.id}`;
           break;
         case "blog":
           url = `/admin/why-choose-us/${deleteData.id}`;
@@ -756,6 +783,12 @@ export default function Landing() {
       ...prev,
       images: newImages,
     }));
+  };
+
+  const [rating, setRating] = useState(0);
+
+  const handleClick = (index) => {
+    setRating(index === rating ? 0 : index); 
   };
 
 
@@ -1478,31 +1511,93 @@ export default function Landing() {
 
                 </div>
                 <div className=" flex  w-[100%]  flex-col mt-[10px] gap-[20px] ">
-                  <p className="font-[500] text-[30px] font-Montserrat">What Our Clients Say About Chhapia Associates</p>
+                  <p className="font-[500] text-[30px] font-Montserrat">Testimonials</p>
 
                   <div className="flex gap-[20px] flex-wrap ">
                     <div className="flex flex-col h-fit w-[320px] p-[14px] rounded-lg border-[#007e2c] border-[1.8px]  gap-[10px]">
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-[20px]">
+                        <label className="h-[80px] w-[90px] border-[#007e2c] border-[1.8px] flex justify-center items-center rounded-[8px] cursor-pointer overflow-hidden relative">
+                          {newTestimonial.image ? (
+                            <img
+                              src={
+                                newTestimonial.image
+                                  ? typeof newTestimonial.image === "string"
+                                    ? newTestimonial.image
+                                    : URL.createObjectURL(newTestimonial.image)
+                                  : ""
+                              }
+                              alt="preview"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <i className="fa-solid text-[20px] text-[#007e2c] fa-plus"></i>
+                          )}
+                          {/* Hidden File Input */}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleTestimonialImageChange} />
+                        </label>
 
-                        <div className=" w-[100%] h-[40px] border-[#007e2c] border-[1.8px] justify-center items-center rounded-[8px] flex cursor-pointer overflow-hidden">
+                        <div className="flex gap-1">
 
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <Star
+                                key={i}
+                                value={newTestimonial.rating} onChange={e => setNewTestimonial({ ...newTestimonial, rating: e.target.value })}
+                                onClick={() => handleClick(i)}
+                                className={`w-5 h-5 cursor-pointer ${i <= rating ? 'text-green-900 fill-current' : 'text-gray-300'
+                                  }`}
+                              />
+                            ))}
+                          </div>
+
+                          {/* </div> */}
                         </div>
                       </div>
 
+
                       <div className="w-[100%]  flex border-[#007e2c] overflow-hidden border-[1.8px] h-[100px] rounded-[8px]">
-                        <textarea placeholder="Details" className=" flex w-[100%] h-[100%] p-[10px] outline-none"
+                        <textarea placeholder="Description" className=" flex w-[100%] h-[100%] p-[10px] outline-none"
                           name="description"
-                          value={newTeamMember.description}
-                          onChange={(e) => setNewTeamMember({ ...newTeamMember, description: e.target.value })}
+                          value={newTestimonial.description}
+                          onChange={(e) => setNewTestimonial({ ...newTestimonial, description: e.target.value })}
                         ></textarea>
                       </div>
+                      <div className="flex items-center gap-[10px]">
+
+                        <div className=" border-[#007e2c] border-[2px] px-2 rounded-[7px] overflow-hidden outline-none focus:border-[#007e2c] focus:ring-0">
+                          <input
+                            placeholder="Name"
+                            type="text"
+                            className="w-[135px] h-[30px]"
+                            name="name"
+                            value={newTestimonial.name}
+                            onChange={(e) => setNewTestimonial({ ...newTestimonial, name: e.target.value })}
+                          />
+                        </div>
+
+                        <div className=" border-[#007e2c] border-[2px] px-2 rounded-[7px] overflow-hidden outline-none focus:border-[#007e2c] focus:ring-0">
+                          <input
+                            placeholder="Profession"
+                            type="text"
+                            className="w-[135px] h-[30px]"
+                            name="profession"
+                            value={newTestimonial.profession}
+                            onChange={(e) => setNewTestimonial({ ...newTestimonial, profession: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
                       <div className="w-[100%] h-[40px] rounded-md mx-auto cursor-pointer flex justify-center items-center text-[#fff]  font-[600]  bs-mix-green active:scale-95 transition-transform duration-150"
-                        onClick={handleAddTeam}
+                        onClick={handleAddTestimonial}
                       >
                         <p>Submit</p>
                       </div>
                     </div>
-
+                    {/* 
                     {Array.isArray(teams) && teams.map((member, index) => (
                       <div key={index} className="flex flex-col border-[#007e2c] border-[1.8px] p-[10px] rounded-lg w-[320px] gap-[10px]">
                         <div className="flex gap-1">
@@ -1538,7 +1633,7 @@ export default function Landing() {
 
                         </div>
                       </div>
-                    ))}
+                    ))} */}
                   </div>
 
                 </div>

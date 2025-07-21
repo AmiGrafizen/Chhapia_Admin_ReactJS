@@ -77,7 +77,7 @@ export const getHeroAction = () => {
 
 export const getTestimonialAction = () => {
   return (dispatch) => {
-      return ApiGet(`/admin/what-we-do`)
+      return ApiGet(`/admin/testimonial`)
     .then((res) => {
       console.log('res', res);
       if (res.data) {
@@ -276,7 +276,7 @@ export const addDesignAction = (designData) => {
 
   export const addTestimonialAction = (stockData) => {
     return (dispatch) => {
-        return ApiPost(`/admin/what-we-do`, stockData)
+        return ApiPost(`/admin/testimonial`, stockData)
       .then((res) => {
         console.log('resasdfg', res);
         if (res.data.whatWeDo) {
@@ -500,7 +500,7 @@ export const updateFAQAction = (id, formData) => {
 
 export const updateTestimonialAction = (id, formData) => {
   return (dispatch) => {
-      return ApiPut(`/admin/what-we-do/${id}`, formData)
+      return ApiPut(`/admin/testimonial/${id}`, formData)
     .then((res) => {
       console.log('res', res);
       if (res.data) {
